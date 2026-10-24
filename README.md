@@ -2,7 +2,7 @@
 
 局域网 SmsForwarder 手机远控控制台：一个二进制（或一个容器）管住局域网里所有装了 [SmsForwarder](https://github.com/pppscn/SmsForwarder) 的安卓手机——扫描发现、连接管理、短信收发、通话与联系人查询、电量/定位/WOL/配置克隆，全部在浏览器完成。**无需修改手机端 APK**。
 
-![Version](https://img.shields.io/badge/version-v1.0.0-blue) ![Go](https://img.shields.io/badge/Go-1.26-00ADD8) ![Vue](https://img.shields.io/badge/Vue-3-42b883) ![License](https://img.shields.io/badge/license-internal-grey)
+![Version](https://img.shields.io/badge/version-v1.0.1-blue) ![Go](https://img.shields.io/badge/Go-1.26-00ADD8) ![Vue](https://img.shields.io/badge/Vue-3-42b883) ![License](https://img.shields.io/badge/license-internal-grey)
 
 ## 功能
 
@@ -22,7 +22,7 @@
 **Linux（推荐 host 网络——容器直接使用宿主网络栈，扫描、直连全部原生可用）：**
 
 ```bash
-docker run -d --name smsfm --network host -v smsfm-data:/app/data posase/smsfm:v1.0.0
+docker run -d --name smsfm --network host -v smsfm-data:/app/data posase/smsfm:v1.0.1
 # host 模式下无需 -p 映射，服务直接监听宿主 8080
 ```
 
@@ -30,7 +30,7 @@ docker run -d --name smsfm --network host -v smsfm-data:/app/data posase/smsfm:v
 
 ```bash
 # 办法一：环境变量显式指定宿主局域网网段（默认扫描范围即为你家/公司网段）
-docker run -d --name smsfm -p 8080:8080 -e SMSFM_NETWORK_CIDRS=192.168.1.0/24   -v smsfm-data:/app/data posase/smsfm:v1.0.0
+docker run -d --name smsfm -p 8080:8080 -e SMSFM_NETWORK_CIDRS=192.168.1.0/24   -v smsfm-data:/app/data posase/smsfm:v1.0.1
 
 # 办法二：不改启动命令，扫描弹窗里手动把网段改成 192.168.1.0/24（TCP 出站经 NAT 可达局域网，扫描与业务调用均正常）
 ```
@@ -49,7 +49,7 @@ docker run -d --name smsfm -p 8080:8080 -e SMSFM_NETWORK_CIDRS=192.168.1.0/24   
 
 ```bash
 # 一键（Docker 多阶段：前端构建 → Go 嵌入 → Alpine 运行镜像）
-docker build -t smsfm:v1.0.0 .
+docker build -t smsfm:v1.0.1 .
 
 # 本地
 cd web && npm ci && npm run build && rm -rf ../server/web && cp -r dist ../server/web

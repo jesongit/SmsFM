@@ -210,15 +210,14 @@ defineExpose({ querySms })
     <div class="table-card">
       <table>
         <thead>
-          <tr><th>时间</th><th>发送方</th><th>接收方</th><th>内容</th><th>SIM</th></tr>
+          <tr><th>时间</th><th>发送方</th><th>接收方</th><th>内容</th></tr>
         </thead>
         <tbody>
           <tr v-for="s in rows" :key="s.date + s.number">
             <td class="t mono">{{ fmtTime(s.date) }}</td>
             <td class="party mono">{{ senderOf(s) }}</td>
             <td class="party mono">{{ receiverOf(s) }}</td>
-            <td class="c">{{ s.content }}</td>
-            <td><span class="simtag">SIM{{ (s.sim_id ?? 0) + 1 }}</span></td>
+            <td class="c" :title="s.content">{{ s.content }}</td>
           </tr>
         </tbody>
       </table>
@@ -332,7 +331,8 @@ defineExpose({ querySms })
   border-radius: 10px;
   overflow: hidden;
 }
-table { width: 100%; border-collapse: collapse; }
+/* 每条记录严格单行：固定列宽 + 超长省略号截断（内容悬停看全文） */
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 th {
   text-align: left;
   font-size: 12px;
@@ -343,24 +343,24 @@ th {
   border-bottom: 1px solid var(--line);
   white-space: nowrap;
 }
+/* 列宽：固定列收紧（号码 11 位/时间/标签），剩余全部留给内容列 */
+th:nth-child(1), td:nth-child(1) { width: 124px; }  /* 时间（完整 "10-24 16:13" 不截断） */
+th:nth-child(2), td:nth-child(2) { width: 168px; }  /* 发送方（长端口号会截断） */
+th:nth-child(3), td:nth-child(3) { width: 122px; }  /* 接收方（基本 11 位本机号） */
+/* 内容列不指定宽度，table-layout:fixed 下独占剩余空间 */
 td {
   padding: 13px 18px;
   font-size: 13px;
   border-bottom: 1px solid var(--line-soft);
-  vertical-align: top;
+  vertical-align: middle;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 tr:last-child td { border-bottom: none; }
-td .t { color: var(--dim); font-size: 12px; white-space: nowrap; }
-td .party { font-size: 12.5px; white-space: nowrap; }
+td .t { color: var(--dim); font-size: 12px; }
+td .party { font-size: 12.5px; }
 td .c { color: #374151; }
-.simtag {
-  font-size: 10.5px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: var(--blue-soft);
-  color: var(--blue);
-  white-space: nowrap;
-}
 .pager {
   display: flex;
   align-items: center;
