@@ -1,0 +1,19 @@
+# 上游参考克隆（独立仓库，不纳入本项目）
+SmsForwarder/
+
+# 设计工件与本地状态
+.impeccable/
+
+# 依赖与构建产物
+web/node_modules/
+web/dist/
+server/web/
+server/smsfm-server.exe
+server/smsfm-server
+server/data/
+server/data-e2e/
+
+# 系统杂项
+*.log
+*.tmp
+.DS_Store

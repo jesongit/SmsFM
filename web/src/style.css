@@ -1,0 +1,90 @@
+/* SmsFM 控制台设计令牌 —— 品类常规执行（批准效果图 .impeccable/mocks/comp-canon.png） */
+:root {
+  --bg: #f8fafc;
+  --card: #ffffff;
+  --ink: #111827;
+  --dim: #6b7280;
+  --faint: #9ca3af;
+  --line: #e5e7eb;
+  --line-soft: #f1f3f5;
+  --blue: #2563eb;
+  --blue-soft: #eff6ff;
+  --green: #16a34a;
+  --green-soft: #dcfce7;
+  --red: #dc2626;
+  --amber: #d97706;
+  --sidebar-w: 264px;
+  --radius: 8px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body, #app { height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono { font-family: Consolas, "SF Mono", "Courier New", monospace; }
+
+button { font-family: inherit; cursor: pointer; }
+input { font-family: inherit; }
+
+/* 全局工具类：主/次按钮（各面板共用） */
+.btn {
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  color: var(--ink);
+}
+.btn.primary {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+  font-weight: 600;
+}
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* 手机浏览器适配（≤768px）：桌面为主的响应式降级 */
+@media (max-width: 768px) {
+  .table-card {
+    margin: 12px 14px !important;
+    overflow-x: auto;
+  }
+  .table-card table { min-width: 560px; }
+  .tools { flex-wrap: wrap; padding: 12px 14px 0 !important; }
+  .tools .search { max-width: none !important; }
+  .err-banner { margin: 10px 14px 0 !important; }
+  .hint { padding: 8px 14px 0 !important; }
+  .note { padding: 10px 14px !important; }
+  .cards { padding: 12px 14px 0 !important; }
+}
+
+/* 浏览器表面：选区、滚动条、焦点环由调色板接管（craft-floor: browser surfaces） */
+::selection {
+  background: rgba(37, 99, 235, 0.16);
+}
+:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #c7cdd6 transparent;
+}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb {
+  background: #c7cdd6;
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-track { background: transparent; }

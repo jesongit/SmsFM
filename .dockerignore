@@ -1,0 +1,21 @@
+# 上游参考克隆（不进镜像）
+SmsForwarder/
+
+# 设计工件与本地状态
+.impeccable/
+.git/
+.github/
+
+# 依赖与构建产物（镜像内重新构建）
+web/node_modules/
+web/dist/
+server/web/
+server/smsfm-server.exe
+server/smsfm-server
+server/data/
+server/data-e2e/
+
+# 系统杂项
+*.log
+*.tmp
+.DS_Store
