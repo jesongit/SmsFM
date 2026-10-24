@@ -1,16 +1,28 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import ConsoleSidebar from './components/ConsoleSidebar.vue'
 import ConsoleMain from './components/ConsoleMain.vue'
+import LoginView from './components/LoginView.vue'
 import { initStore } from './stores/devices'
+import { getToken, setUnauthorizedHandler } from './api/auth'
+
+const logged = ref(false)
+
+setUnauthorizedHandler(() => { logged.value = false })
 
 onMounted(() => {
-  void initStore()
+  logged.value = Boolean(getToken())
+  if (logged.value) void initStore()
 })
+function onLogged(): void {
+  logged.value = true
+  void initStore()
+}
 </script>
 
 <template>
-  <div class="app-shell">
+  <LoginView v-if="!logged" @logged="onLogged" />
+  <div v-else class="app-shell">
     <ConsoleSidebar />
     <ConsoleMain />
   </div>

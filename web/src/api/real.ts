@@ -4,6 +4,7 @@
  * 前端 dev 模式经 Vite proxy /api → localhost:8080；生产与后端同源。
  */
 
+import { getToken, unauthorized } from './auth'
 import type {
   BaseRequest,
   BatteryInfo,
@@ -63,10 +64,14 @@ export class BackendError extends Error {
 }
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getToken()
   let resp: Response
   try {
     resp = await fetch(path, {
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       ...init,
     })
   } catch (e) {
@@ -75,6 +80,10 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
       'connection',
       '连接失败',
     )
+  }
+  if (resp.status === 401) {
+    unauthorized() // 清 token 回登录页
+    throw new BackendError('未登录或会话已过期', 'auth', '鉴权失败')
   }
   const text = await resp.text()
   let body: unknown = null

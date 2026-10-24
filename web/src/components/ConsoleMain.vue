@@ -6,6 +6,8 @@ import type { ConfigData } from '../api/types'
 import CallPanel from './panels/CallPanel.vue'
 import ContactPanel from './panels/ContactPanel.vue'
 import OtherPanel from './panels/OtherPanel.vue'
+import AccountPanel from './panels/AccountPanel.vue'
+import { logout } from '../api/auth'
 import ComposeDrawer from './ComposeDrawer.vue'
 import SettingsDrawer from './SettingsDrawer.vue'
 import ScanModal from './ScanModal.vue'
@@ -34,6 +36,7 @@ const tabs = computed(() => {
     enabled: enabledAny(c, ['enable_api_battery_query', 'enable_api_location', 'enable_api_wol', 'enable_api_clone']),
     label2: '其他',
   })
+  tabsList.push({ key: 'account', label: '账号', flag: '', enabled: true, label2: '账号' })
   return tabsList
 })
 const activeTab = ref<string>('sms')
@@ -44,6 +47,12 @@ const PANELS: Record<string, Component> = {
   call: CallPanel,
   contact: ContactPanel,
   other: OtherPanel,
+  account: AccountPanel,
+}
+
+async function doLogout(): Promise<void> {
+  await logout()
+  location.reload()
 }
 const currentPanel = computed(() => PANELS[activeTab.value] ?? SmsPanel)
 
@@ -76,6 +85,7 @@ function refresh(): void {
         <button class="btn" @click="refresh">刷新状态</button>
         <button class="btn" @click="openSettings">连接设置</button>
         <button class="btn primary" @click="showCompose = true">写短信</button>
+        <button class="btn" title="退出登录" @click="doLogout">退出</button>
       </div>
     </div>
 

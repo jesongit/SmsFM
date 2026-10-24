@@ -2,7 +2,7 @@
 
 局域网 SmsForwarder 手机远控控制台：一个二进制（或一个容器）管住局域网里所有装了 [SmsForwarder](https://github.com/pppscn/SmsForwarder) 的安卓手机——扫描发现、连接管理、短信收发、通话与联系人查询、电量/定位/WOL/配置克隆，全部在浏览器完成。**无需修改手机端 APK**。
 
-![Version](https://img.shields.io/badge/version-v1.0.1-blue) ![Go](https://img.shields.io/badge/Go-1.26-00ADD8) ![Vue](https://img.shields.io/badge/Vue-3-42b883) ![License](https://img.shields.io/badge/license-internal-grey)
+![Version](https://img.shields.io/badge/version-v1.0.2-blue) ![Go](https://img.shields.io/badge/Go-1.26-00ADD8) ![Vue](https://img.shields.io/badge/Vue-3-42b883) ![License](https://img.shields.io/badge/license-internal-grey)
 
 ## 功能
 
@@ -11,6 +11,7 @@
 - **协议适配**：上游四种安全模式全支持——无安全措施 / 时间戳签名（HMAC-SHA256）/ RSA（2048 公钥分段加密）/ SM4（CBC·PKCS7·固定 IV）；错误分级：连接失败 / 鉴权失败 / 功能未开启 / 业务错误 / 协议不符
 - **九项能力**：短信查询（收/发、关键词、SIM 筛选、翻页、15s 新短信自动检测）、短信发送（选卡、分条计费、超时显示「结果未知」不自动重发）、通话记录（呼入/呼出/未接）、联系人查询与新增、电量、定位缓存（显示定位时间）、WOL 唤醒、配置克隆/导出/恢复（恢复前强制确认影响范围）
 - **如实表达协议语义**：HTTP 200 还查业务 code；发送成功 ≠ 对方收到；空列表不解释为无记录；定位只读缓存；WOL 成功 ≠ 已开机
+- **登录与 2FA**：登录页（记住我）+ 账号页（改用户名/密码、TOTP 两步验证扫码绑定）、右上角退出登录
 - **单管理员场景**：1–20 台手机，业务数据不落库，只保存连接参数与凭据
 
 ## 快速开始
@@ -22,7 +23,7 @@
 **Linux（推荐 host 网络——容器直接使用宿主网络栈，扫描、直连全部原生可用）：**
 
 ```bash
-docker run -d --name smsfm --network host -v smsfm-data:/app/data posase/smsfm:v1.0.1
+docker run -d --name smsfm --network host -v smsfm-data:/app/data posase/smsfm:v1.0.2
 # host 模式下无需 -p 映射，服务直接监听宿主 8080
 ```
 
@@ -30,7 +31,7 @@ docker run -d --name smsfm --network host -v smsfm-data:/app/data posase/smsfm:v
 
 ```bash
 # 办法一：环境变量显式指定宿主局域网网段（默认扫描范围即为你家/公司网段）
-docker run -d --name smsfm -p 8080:8080 -e SMSFM_NETWORK_CIDRS=192.168.1.0/24   -v smsfm-data:/app/data posase/smsfm:v1.0.1
+docker run -d --name smsfm -p 8080:8080 -e SMSFM_NETWORK_CIDRS=192.168.1.0/24   -v smsfm-data:/app/data posase/smsfm:v1.0.2
 
 # 办法二：不改启动命令，扫描弹窗里手动把网段改成 192.168.1.0/24（TCP 出站经 NAT 可达局域网，扫描与业务调用均正常）
 ```
@@ -43,13 +44,15 @@ docker run -d --name smsfm -p 8080:8080 -e SMSFM_NETWORK_CIDRS=192.168.1.0/24   
 ./smsfm-server -addr :8080 -data ./data   # 默认 8080，连接配置存 ./data
 ```
 
-启动后点「扫描局域网设备」自动发现（默认端口 5000），或「连接设置 → 手动连接」添加。后端不可用时前端自动进入演示模式（界面标注「演示数据为合成」）。
+首次访问进入**登录页**，默认账号与密码均为 `admin`（登录后在「账号」页修改，账号页还支持开启**两步验证**——TOTP，Google Authenticator 扫码绑定）。登录后点「扫描局域网设备」自动发现（默认端口 5000），或「连接设置 → 手动连接」添加。后端不可用时前端自动进入演示模式（界面标注「演示数据为合成」）。
+
+安全机制：bcrypt 密码哈希；除登录接口与健康检查外全部 API 需 Bearer Token（记住我 30 天，否则 12 小时，服务重启后需重新登录）；连续 5 次密码错误锁定 1 分钟。
 
 ## 构建
 
 ```bash
 # 一键（Docker 多阶段：前端构建 → Go 嵌入 → Alpine 运行镜像）
-docker build -t smsfm:v1.0.1 .
+docker build -t smsfm:v1.0.2 .
 
 # 本地
 cd web && npm ci && npm run build && rm -rf ../server/web && cp -r dist ../server/web

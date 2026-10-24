@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"smsfm/server/internal/auth"
 	"smsfm/server/internal/protocol"
 	"smsfm/server/internal/scan"
 	"smsfm/server/internal/store"
@@ -25,6 +26,7 @@ import (
 // Server 控制台后端
 type Server struct {
 	store       *store.Store
+	auth        *auth.Store
 	mux         *http.ServeMux
 	callTimeout time.Duration
 
@@ -33,8 +35,8 @@ type Server struct {
 }
 
 // New 建立服务；staticFS 为前端构建产物（可为 nil：仅 API 模式）
-func New(st *store.Store, staticFS fs.FS) *Server {
-	s := &Server{store: st, mux: http.NewServeMux(), callTimeout: 30 * time.Second}
+func New(st *store.Store, authStore *auth.Store, staticFS fs.FS) *Server {
+	s := &Server{store: st, auth: authStore, mux: http.NewServeMux(), callTimeout: 30 * time.Second}
 	s.routes()
 	if staticFS != nil {
 		s.mux.Handle("/", spaHandler(staticFS))
@@ -42,9 +44,176 @@ func New(st *store.Store, staticFS fs.FS) *Server {
 	return s
 }
 
-func (s *Server) Handler() http.Handler { return s.mux }
+// Handler 鉴权中间件：/api/auth/* 与 /api/health 开放，其余 /api/* 需 Bearer token
+func (s *Server) Handler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p := r.URL.Path
+		// 开放端点：仅登录两步与 health；其余（含账号管理/2FA）都需登录
+		open := p == "/api/health" || p == "/api/auth/login" || p == "/api/auth/login-2fa"
+		if strings.HasPrefix(p, "/api/") && !open {
+			token := bearerToken(r)
+			if token == "" || !s.auth.Valid(token) {
+				writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "未登录或会话已过期"})
+				return
+			}
+		}
+		s.mux.ServeHTTP(w, r)
+	})
+}
+
+func bearerToken(r *http.Request) string {
+	h := r.Header.Get("Authorization")
+	if len(h) > 7 && strings.EqualFold(h[:7], "Bearer ") {
+		return strings.TrimSpace(h[7:])
+	}
+	return ""
+}
+
+/* ── 认证端点 ── */
+
+func (s *Server) authLogin(w http.ResponseWriter, r *http.Request) {
+	var b struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+		Remember bool   `json:"remember"`
+	}
+	if !readJSON(w, r, &b) {
+		return
+	}
+	token, ticket, err := s.auth.LoginStep1(b.Username, b.Password, b.Remember)
+	if err != nil {
+		writeErr(w, http.StatusUnauthorized, err)
+		return
+	}
+	if ticket != "" {
+		// 已开启两步验证：返回票据，等验证码
+		writeJSON(w, http.StatusOK, map[string]any{"need2fa": true, "ticket": ticket})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"token": token})
+}
+
+func (s *Server) authLogin2FA(w http.ResponseWriter, r *http.Request) {
+	var b struct {
+		Ticket   string `json:"ticket"`
+		Code     string `json:"code"`
+		Remember bool   `json:"remember"`
+	}
+	if !readJSON(w, r, &b) {
+		return
+	}
+	token, err := s.auth.LoginStep2(b.Ticket, b.Code, b.Remember)
+	if err != nil {
+		writeErr(w, http.StatusUnauthorized, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"token": token})
+}
+
+func (s *Server) authLogout(w http.ResponseWriter, r *http.Request) {
+	if tk := bearerToken(r); tk != "" {
+		s.auth.Logout(tk)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+func (s *Server) authMe(w http.ResponseWriter, r *http.Request) {
+	token := bearerToken(r)
+	if token == "" {
+		writeErr(w, http.StatusUnauthorized, errors.New("未登录"))
+		return
+	}
+	if !s.auth.Valid(token) {
+		writeErr(w, http.StatusUnauthorized, errors.New("会话已过期"))
+		return
+	}
+	username, totpEnabled, isDefault := s.auth.Me()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"username": username, "totpEnabled": totpEnabled, "isDefaultPassword": isDefault,
+	})
+}
+
+func (s *Server) authChangePassword(w http.ResponseWriter, r *http.Request) {
+	var b struct {
+		OldPassword string
+		NewPassword string
+	}
+	if !readJSON(w, r, &b) {
+		return
+	}
+	if err := s.auth.ChangePassword(b.OldPassword, b.NewPassword); err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+func (s *Server) authChangeUsername(w http.ResponseWriter, r *http.Request) {
+	var b struct {
+		Password    string
+		NewUsername string
+	}
+	if !readJSON(w, r, &b) {
+		return
+	}
+	if err := s.auth.ChangeUsername(b.Password, b.NewUsername); err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+func (s *Server) authTOTPSetup(w http.ResponseWriter, _ *http.Request) {
+	secret, uri, err := s.auth.TOTPSetup()
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"secret": secret, "otpauthUrl": uri})
+}
+
+func (s *Server) authTOTPEnable(w http.ResponseWriter, r *http.Request) {
+	var b struct {
+		Secret string
+		Code   string
+	}
+	if !readJSON(w, r, &b) {
+		return
+	}
+	if err := s.auth.TOTPEnable(b.Secret, b.Code); err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+func (s *Server) authTOTPDisable(w http.ResponseWriter, r *http.Request) {
+	var b struct {
+		Password string `json:"password"`
+	}
+	if !readJSON(w, r, &b) {
+		return
+	}
+	if err := s.auth.TOTPDisable(b.Password); err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
 
 func (s *Server) routes() {
+	/* 认证端点（开放） */
+	s.mux.HandleFunc("POST /api/auth/login", s.authLogin)
+	s.mux.HandleFunc("POST /api/auth/login-2fa", s.authLogin2FA)
+	s.mux.HandleFunc("POST /api/auth/logout", s.authLogout)
+	s.mux.HandleFunc("GET /api/auth/me", s.authMe)
+	s.mux.HandleFunc("POST /api/auth/change-password", s.authChangePassword)
+	s.mux.HandleFunc("POST /api/auth/change-username", s.authChangeUsername)
+	s.mux.HandleFunc("POST /api/auth/totp/setup", s.authTOTPSetup)
+	s.mux.HandleFunc("POST /api/auth/totp/enable", s.authTOTPEnable)
+	s.mux.HandleFunc("POST /api/auth/totp/disable", s.authTOTPDisable)
+
+	/* 其余 /api 需要登录（health 例外，供前端探测后端与演示模式切换） */
 	s.mux.HandleFunc("GET /api/health", s.health)
 	s.mux.HandleFunc("GET /api/networks", s.networks)
 

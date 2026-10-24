@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 
 	"smsfm/server/internal/api"
+	"smsfm/server/internal/auth"
 	"smsfm/server/internal/store"
 )
 
@@ -29,6 +30,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("打开数据目录失败：%v", err)
 	}
+	authStore, err := auth.Open(*dataDir)
+	if err != nil {
+		log.Fatalf("初始化账号失败：%v", err)
+	}
 
 	var webFS fs.FS
 	if *webDir != "" {
@@ -41,7 +46,7 @@ func main() {
 		webFS = sub
 	}
 
-	srv := api.New(st, webFS)
+	srv := api.New(st, authStore, webFS)
 	log.Printf("SmsFM 控制台后端启动：http://localhost%s（数据目录 %s）", *addr, *dataDir)
 	if err := http.ListenAndServe(*addr, srv.Handler()); err != nil {
 		fmt.Fprintf(os.Stderr, "服务退出：%v\n", err)
